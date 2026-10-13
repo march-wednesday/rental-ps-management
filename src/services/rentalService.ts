@@ -229,10 +229,26 @@ export const rentalService = {
     durationMinutes: number;
     notes?: string;
   }): Promise<{ success: boolean; rental?: RentalSession; error?: string }> {
+    // 1. Resolve unit ID for Supabase & Local
+    let sbUnitId = params.unitId;
+    if (sbUnitId === 'unit-ps-01' || sbUnitId === 'PS-01') sbUnitId = '028ea2d7-c00a-410b-b660-d73dc2ff536b';
+    if (sbUnitId === 'unit-ps-02' || sbUnitId === 'PS-02') sbUnitId = '2ac6a322-a4fe-41a1-9bc0-b6a280dd13fc';
+
+    let localUnitId = params.unitId;
+    if (localUnitId === '028ea2d7-c00a-410b-b660-d73dc2ff536b') localUnitId = 'unit-ps-01';
+    if (localUnitId === '2ac6a322-a4fe-41a1-9bc0-b6a280dd13fc') localUnitId = 'unit-ps-02';
+
+    // 2. Start in localEngine immediately
+    const localRes = localEngine.rpcStartRental({
+      ...params,
+      unitId: localUnitId,
+    });
+
+    // 3. If Supabase configured, call RPC in cloud
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase.rpc('rpc_start_rental', {
-          p_unit_id: params.unitId,
+          p_unit_id: sbUnitId,
           p_customer_name: params.customerName,
           p_customer_phone: params.customerPhone || null,
           p_tariff_package_id: params.tariffPackageId || null,
@@ -241,15 +257,21 @@ export const rentalService = {
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
 
-        if (error) throw error;
-        // Also sync local state if needed
-        return { success: true };
+        if (error) {
+          console.warn('Supabase rpc_start_rental warning:', error);
+        } else if (data && data.rental_id && localRes.rental) {
+          localRes.rental.id = data.rental_id;
+          localRes.rental.rentalCode = data.rental_code || localRes.rental.rentalCode;
+          localEngine.saveState();
+        }
       } catch (e: any) {
-        console.warn('Supabase rpc_start_rental error, trying local fallback:', e);
+        console.warn('Supabase rpc_start_rental error:', e);
       }
     }
 
-    return localEngine.rpcStartRental(params);
+    // 4. Dispatch update event so Logbook, Dashboard, and Reports immediately refresh
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Atomic Extend Rental Session (Tambah Waktu)
@@ -258,58 +280,61 @@ export const rentalService = {
     additionalMinutes: number;
     additionalPrice: number;
   }): Promise<{ success: boolean; rental?: RentalSession; error?: string }> {
-    if (isSupabaseConfigured) {
+    const localRes = localEngine.rpcExtendRental(params);
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.rentalId)) {
       try {
-        const { data, error } = await supabase.rpc('rpc_extend_rental', {
+        await supabase.rpc('rpc_extend_rental', {
           p_rental_id: params.rentalId,
           p_additional_minutes: params.additionalMinutes,
           p_additional_price: params.additionalPrice,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
       } catch (e: any) {
         console.warn('Supabase rpc_extend_rental error:', e);
       }
     }
 
-    return localEngine.rpcExtendRental(params);
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Atomic Complete Rental Session (Selesaikan Sewa)
   async completeRental(rentalId: string): Promise<{ success: boolean; rental?: RentalSession; error?: string }> {
-    if (isSupabaseConfigured) {
+    const localRes = localEngine.rpcCompleteRental({ rentalId });
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rentalId)) {
       try {
-        const { error } = await supabase.rpc('rpc_complete_rental', {
+        await supabase.rpc('rpc_complete_rental', {
           p_rental_id: rentalId,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
       } catch (e: any) {
         console.warn('Supabase rpc_complete_rental error:', e);
       }
     }
 
-    return localEngine.rpcCompleteRental({ rentalId });
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Atomic Cancel Rental Session (Batalkan Sewa)
   async cancelRental(rentalId: string, reason: string): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured) {
+    const localRes = localEngine.rpcCancelRental({ rentalId, reason });
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rentalId)) {
       try {
-        const { error } = await supabase.rpc('rpc_cancel_rental', {
+        await supabase.rpc('rpc_cancel_rental', {
           p_rental_id: rentalId,
           p_reason: reason,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
       } catch (e: any) {
         console.warn('Supabase rpc_cancel_rental error:', e);
       }
     }
 
-    return localEngine.rpcCancelRental({ rentalId, reason });
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 };

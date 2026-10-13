@@ -236,6 +236,7 @@ export const LogbookPage: React.FC = () => {
                 <th className="py-3 px-3">Target Selesai</th>
                 <th className="py-3 px-3 text-right">Tagihan</th>
                 <th className="py-3 px-3 text-right">Dibayar</th>
+                <th className="py-3 px-3 text-center">Status Sesi</th>
                 <th className="py-3 px-3 text-center">Status Bayar</th>
                 <th className="py-3 px-3 text-center">Catatan</th>
               </tr>
@@ -243,7 +244,7 @@ export const LogbookPage: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60 font-sans">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500">
+                  <td colSpan={12} className="py-8 text-center text-slate-500">
                     {isLoading ? 'Memuat data dari database...' : 'Belum ada riwayat rental yang sesuai dengan filter.'}
                   </td>
                 </tr>
@@ -276,6 +277,25 @@ export const LogbookPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
                       {formatRupiah(r.totalPaid)}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <Badge
+                        variant={
+                          r.status === 'active'
+                            ? 'purple'
+                            : r.status === 'completed'
+                            ? 'success'
+                            : 'neutral'
+                        }
+                        size="sm"
+                        dot={r.status === 'active'}
+                      >
+                        {r.status === 'active'
+                          ? 'Sedang Main'
+                          : r.status === 'completed'
+                          ? 'Selesai'
+                          : 'Batal'}
+                      </Badge>
                     </td>
                     <td className="py-3 px-3 text-center">
                       <Badge
