@@ -146,6 +146,7 @@ export interface AppGeneralSettings {
   operatingDaysPerMonth: number;
   overtimeGraceMinutes: number;
   overtimeChargePer15Min: number;
+  ownerPin?: string;
 }
 
 export interface ImportBatchSummary {

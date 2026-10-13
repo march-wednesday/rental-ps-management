@@ -15,6 +15,9 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  KeyRound,
+  Crown,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRental } from '@/context/RentalContext';
@@ -32,7 +35,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenMobileMenu,
   onOpenStartRental,
 }) => {
-  const { user, role, logout } = useAuth();
+  const { user, role, isOwner, openPinModal, lockToCashier, logout } = useAuth();
   const { activeRentals, units } = useRental();
   const { theme, toggleTheme, isDark } = useTheme();
   const { isOnline, pendingCount, isSyncing, triggerSync } = useOfflineSync();
@@ -128,16 +131,46 @@ export const Topbar: React.FC<TopbarProps> = ({
           <span className="hidden sm:inline">Mulai Sewa</span>
         </button>
 
-        {/* Role Pill */}
+        {/* Role Pill & Owner PIN Switcher */}
+        {!isOwner ? (
+          <button
+            onClick={() => openPinModal()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+            title="Klik untuk membuka Mode Owner dengan PIN"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden sm:inline">Masuk Owner</span>
+          </button>
+        ) : (
+          <button
+            onClick={lockToCashier}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-amber-300 text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+            title="Klik untuk mengunci kembali ke Mode Kasir"
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Kunci Kasir</span>
+          </button>
+        )}
+
+        {/* Current Role Badge */}
         <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-          <Shield className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="capitalize text-slate-300 text-[11px] font-medium">{role}</span>
+          {isOwner ? (
+            <>
+              <Crown className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-purple-300 text-[11px] font-semibold">Owner</span>
+            </>
+          ) : (
+            <>
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-300 text-[11px] font-semibold">Kasir</span>
+            </>
+          )}
         </div>
 
         {/* Logout Button */}
         <button
           onClick={logout}
-          title="Keluar / Ganti Akun"
+          title="Keluar / Reset ke Kasir"
           className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-900 border border-slate-800 transition-colors"
         >
           <LogOut className="w-4 h-4" />

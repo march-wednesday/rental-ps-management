@@ -50,10 +50,10 @@ const INITIAL_STATE: DatabaseState = {
     },
   ],
   currentUser: {
-    id: 'usr-owner-001',
-    email: 'owner@rentalps.com',
-    fullName: 'Owner Rental PS',
-    role: 'owner',
+    id: 'usr-operator-001',
+    email: 'kasir@rentalps.com',
+    fullName: 'Kasir Shift 1',
+    role: 'operator',
     createdAt: '2026-10-01T08:00:00.000Z',
   },
   units: [
@@ -224,6 +224,7 @@ const INITIAL_STATE: DatabaseState = {
     operatingDaysPerMonth: 30,
     overtimeGraceMinutes: 5,
     overtimeChargePer15Min: 3000,
+    ownerPin: '1234',
   },
   importBatches: [],
 };

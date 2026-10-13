@@ -1,6 +1,6 @@
 // ==============================================================================
 // RENTAL PS MANAGEMENT SYSTEM - MAIN ROUTER & APP ROOT
-// ThemeProvider (Dark/Light) & OfflineSyncProvider Integration
+// Default route: /rental for Cashier, /dashboard for Owner. OwnerRouteGuard enabled.
 // ==============================================================================
 
 import React from 'react';
@@ -11,8 +11,10 @@ import { OfflineSyncProvider } from '@/context/OfflineSyncContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { RentalProvider } from '@/context/RentalContext';
 
-// Layout
+// Layout & Security Components
 import { MainLayout } from '@/components/layout/MainLayout';
+import { OwnerPinModal } from '@/components/auth/OwnerPinModal';
+import { OwnerRouteGuard } from '@/components/auth/OwnerRouteGuard';
 
 // Pages
 import { LoginPage } from '@/pages/LoginPage';
@@ -29,13 +31,19 @@ import { AppSettingsPage } from '@/pages/AppSettingsPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { AuditLogPage } from '@/pages/AuditLogPage';
 
-// Protected Route Wrapper
+// Protected Route Wrapper for logged in users
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
+};
+
+// Root index redirect: Cashier goes to /rental, Owner goes to /dashboard
+const RootIndexRedirect: React.FC = () => {
+  const { isOwner } = useAuth();
+  return <Navigate to={isOwner ? "/dashboard" : "/rental"} replace />;
 };
 
 export default function App() {
@@ -46,6 +54,7 @@ export default function App() {
           <OfflineSyncProvider>
             <AuthProvider>
               <RentalProvider>
+                <OwnerPinModal />
                 <Routes>
                   {/* Public Route */}
                   <Route path="/login" element={<LoginPage />} />
@@ -59,23 +68,105 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Navigate to="/dashboard" replace />} />
-                    <Route path="dashboard" element={<DashboardPage />} />
+                    {/* Index Route */}
+                    <Route index element={<RootIndexRedirect />} />
+
+                    {/* Operational Cashier Route (Open to Cashier & Owner) */}
                     <Route path="rental" element={<RentalPage />} />
-                    <Route path="logbook" element={<LogbookPage />} />
-                    <Route path="keuangan/kas" element={<CashBookPage />} />
-                    <Route path="keuangan/pengeluaran" element={<ExpensePage />} />
-                    <Route path="laporan" element={<ReportsPage />} />
-                    <Route path="inventaris" element={<InventoryPage />} />
-                    <Route path="excel" element={<ExcelPage />} />
-                    <Route path="pengaturan/tarif" element={<TariffSettingsPage />} />
-                    <Route path="pengaturan/aplikasi" element={<AppSettingsPage />} />
-                    <Route path="pengguna" element={<UsersPage />} />
-                    <Route path="audit-log" element={<AuditLogPage />} />
+
+                    {/* Owner-Protected Routes */}
+                    <Route
+                      path="dashboard"
+                      element={
+                        <OwnerRouteGuard>
+                          <DashboardPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="logbook"
+                      element={
+                        <OwnerRouteGuard>
+                          <LogbookPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="keuangan/kas"
+                      element={
+                        <OwnerRouteGuard>
+                          <CashBookPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="keuangan/pengeluaran"
+                      element={
+                        <OwnerRouteGuard>
+                          <ExpensePage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="laporan"
+                      element={
+                        <OwnerRouteGuard>
+                          <ReportsPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="inventaris"
+                      element={
+                        <OwnerRouteGuard>
+                          <InventoryPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="excel"
+                      element={
+                        <OwnerRouteGuard>
+                          <ExcelPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="pengaturan/tarif"
+                      element={
+                        <OwnerRouteGuard>
+                          <TariffSettingsPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="pengaturan/aplikasi"
+                      element={
+                        <OwnerRouteGuard>
+                          <AppSettingsPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="pengguna"
+                      element={
+                        <OwnerRouteGuard>
+                          <UsersPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="audit-log"
+                      element={
+                        <OwnerRouteGuard>
+                          <AuditLogPage />
+                        </OwnerRouteGuard>
+                      }
+                    />
                   </Route>
 
                   {/* Fallback */}
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<RootIndexRedirect />} />
                 </Routes>
               </RentalProvider>
             </AuthProvider>
