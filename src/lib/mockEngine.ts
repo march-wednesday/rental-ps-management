@@ -219,6 +219,22 @@ class LocalEngine {
     this.persistState();
   }
 
+  public updateRentalSession(rentalId: string, updates: Partial<RentalSession>): { success: boolean; rental?: RentalSession; error?: string } {
+    const rental = this.state.rentals.find((r) => r.id === rentalId || r.rentalCode === rentalId);
+    if (!rental) {
+      return { success: false, error: 'Sesi rental tidak ditemukan.' };
+    }
+    Object.assign(rental, updates);
+    this.addAuditLog({
+      action: 'UPDATE_RENTAL',
+      tableName: 'rentals',
+      recordId: rental.id,
+      changes: updates,
+    });
+    this.persistState();
+    return { success: true, rental };
+  }
+
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {

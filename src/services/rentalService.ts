@@ -337,4 +337,54 @@ export const rentalService = {
     window.dispatchEvent(new CustomEvent('rental-data-updated'));
     return localRes;
   },
+
+  // Update any fields of a rental session in Logbook
+  async updateRentalSession(
+    rentalId: string,
+    updates: Partial<RentalSession>
+  ): Promise<{ success: boolean; error?: string }> {
+    const localRes = localEngine.updateRentalSession(rentalId, updates);
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rentalId)) {
+      try {
+        const payload: any = {};
+        if (updates.customerName !== undefined) payload.customer_name = updates.customerName;
+        if (updates.customerPhone !== undefined) payload.customer_phone = updates.customerPhone || null;
+        if (updates.durationMinutes !== undefined) payload.duration_minutes = updates.durationMinutes;
+        if (updates.totalPrice !== undefined) payload.total_price = updates.totalPrice;
+        if (updates.totalPaid !== undefined) payload.total_paid = updates.totalPaid;
+        if (updates.paymentStatus !== undefined) payload.payment_status = updates.paymentStatus;
+        if (updates.status !== undefined) payload.status = updates.status;
+        if (updates.notes !== undefined) payload.notes = updates.notes || null;
+        if (updates.unitId !== undefined) {
+          let sbUnitId = updates.unitId;
+          if (sbUnitId === 'unit-ps-01' || sbUnitId === 'PS-01') sbUnitId = '028ea2d7-c00a-410b-b660-d73dc2ff536b';
+          if (sbUnitId === 'unit-ps-02' || sbUnitId === 'PS-02') sbUnitId = '2ac6a322-a4fe-41a1-9bc0-b6a280dd13fc';
+          payload.unit_id = sbUnitId;
+        }
+
+        const { error } = await supabase.from('rentals').update(payload).eq('id', rentalId);
+        if (error) console.warn('Supabase updateRentalSession warning:', error);
+      } catch (e: any) {
+        console.warn('Supabase updateRentalSession error:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
+  },
+
+  // Quick Action: Mark a rental session as paid (Lunas)
+  async markRentalAsPaid(
+    rentalId: string,
+    totalPrice?: number
+  ): Promise<{ success: boolean; error?: string }> {
+    const existing = localEngine.getState().rentals.find((r) => r.id === rentalId || r.rentalCode === rentalId);
+    const amount = totalPrice !== undefined ? totalPrice : (existing?.totalPrice || 10000);
+
+    return this.updateRentalSession(rentalId, {
+      paymentStatus: 'Lunas',
+      totalPaid: amount,
+    });
+  },
 };

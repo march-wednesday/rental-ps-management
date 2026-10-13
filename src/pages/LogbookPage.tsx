@@ -8,6 +8,8 @@ import React, { useState, useEffect } from 'react';
 import { rentalService } from '@/services/rentalService';
 import { excelService } from '@/services/excelService';
 import { useRental } from '@/context/RentalContext';
+import { useToast } from '@/context/ToastContext';
+import { EditRentalModal } from '@/features/rental/EditRentalModal';
 import { RentalSession } from '@/types';
 import { formatRupiah, formatDuration } from '@/utils/formatters';
 import { formatIndonesianDateTime } from '@/utils/dateUtils';
@@ -22,12 +24,18 @@ import {
   Coins,
   CheckCircle2,
   Calendar,
+  Edit3,
 } from 'lucide-react';
 
 export const LogbookPage: React.FC = () => {
   const { units } = useRental();
+  const { success, error } = useToast();
   const [rentals, setRentals] = useState<RentalSession[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Edit Modal State
+  const [editingRental, setEditingRental] = useState<RentalSession | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -41,6 +49,20 @@ export const LogbookPage: React.FC = () => {
     const data = await rentalService.getRentals(false);
     setRentals(data);
     setIsLoading(false);
+  };
+
+  const handleQuickMarkPaid = async (rental: RentalSession) => {
+    try {
+      const res = await rentalService.markRentalAsPaid(rental.id, rental.totalPrice);
+      if (res.success) {
+        success('Pembayaran Lunas', `Sesi ${rental.rentalCode} (${rental.customerName}) telah ditandai Lunas.`);
+        loadRentals();
+      } else {
+        error('Gagal Memperbarui', res.error || 'Terjadi kesalahan');
+      }
+    } catch (err: any) {
+      error('Gagal Memperbarui', err.message);
+    }
   };
 
   useEffect(() => {
@@ -239,12 +261,13 @@ export const LogbookPage: React.FC = () => {
                 <th className="py-3 px-3 text-center">Status Sesi</th>
                 <th className="py-3 px-3 text-center">Status Bayar</th>
                 <th className="py-3 px-3 text-center">Catatan</th>
+                <th className="py-3 px-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-sans">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-slate-500">
+                  <td colSpan={13} className="py-8 text-center text-slate-500">
                     {isLoading ? 'Memuat data dari database...' : 'Belum ada riwayat rental yang sesuai dengan filter.'}
                   </td>
                 </tr>
@@ -314,6 +337,32 @@ export const LogbookPage: React.FC = () => {
                     <td className="py-3 px-3 text-slate-400 text-[11px]">
                       {r.notes || '-'}
                     </td>
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {r.paymentStatus !== 'Lunas' && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickMarkPaid(r)}
+                            title="Tandai Pembayaran Lunas Langsung"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1 shadow-sm"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Lunas</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingRental(r);
+                            setIsEditModalOpen(true);
+                          }}
+                          title="Edit Data Sesi & Status"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-purple-400" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -321,6 +370,17 @@ export const LogbookPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Edit Rental Modal */}
+      <EditRentalModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingRental(null);
+        }}
+        rental={editingRental}
+        onSuccess={loadRentals}
+      />
     </div>
   );
 };
