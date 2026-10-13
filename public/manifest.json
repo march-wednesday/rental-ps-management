@@ -2,11 +2,14 @@
   "name": "Rental PS Management System",
   "short_name": "Rental PS",
   "description": "Sistem Manajemen & Kasir Rental PlayStation Lengkap dengan Timer Real-Time dan Pembukuan Kas",
-  "start_url": "/rental",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#020617",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e17",
   "theme_color": "#7c3aed",
+  "categories": ["utilities", "business", "entertainment"],
   "icons": [
     {
       "src": "/icon-192.png",

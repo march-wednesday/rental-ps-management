@@ -3,19 +3,27 @@
 // Enables PWA installation and offline caching
 // ==============================================================================
 
-const CACHE_NAME = 'rental-ps-cache-v1';
+const CACHE_NAME = 'rental-ps-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/rental',
+  '/favicon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
 // Install event
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of STATIC_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('PWA Asset precache skipped:', asset, err);
+        }
+      }
     })
   );
   self.skipWaiting();
@@ -35,10 +43,9 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests
   if (event.request.method !== 'GET') return;
 
-  // Let Supabase API requests pass directly with network-first fallback
+  // Let Supabase API requests pass directly to network
   if (event.request.url.includes('supabase.co')) {
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
@@ -50,22 +57,24 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       return (
         cached ||
-        fetch(event.request).then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+        fetch(event.request)
+          .then((response) => {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
             return response;
-          }
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-          return response;
-        })
+          })
+          .catch(() => {
+            // If offline and navigating HTML, return index.html
+            if (event.request.headers.get('accept')?.includes('text/html')) {
+              return caches.match('/index.html');
+            }
+          })
       );
-    }).catch(() => {
-      // If offline and navigating HTML, return index.html
-      if (event.request.headers.get('accept')?.includes('text/html')) {
-        return caches.match('/index.html');
-      }
     })
   );
 });

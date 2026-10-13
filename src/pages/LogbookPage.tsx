@@ -45,6 +45,13 @@ export const LogbookPage: React.FC = () => {
 
   useEffect(() => {
     loadRentals();
+    const handleUpdate = () => {
+      loadRentals();
+    };
+    window.addEventListener('rental-data-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('rental-data-updated', handleUpdate);
+    };
   }, []);
 
   const filtered = rentals.filter((r) => {

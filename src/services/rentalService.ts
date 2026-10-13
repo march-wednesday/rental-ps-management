@@ -174,20 +174,20 @@ export const rentalService = {
           *,
           units (code, name),
           tariff_packages (name)
-        `).order('created_at', { ascending: false });
+        `).order('start_time', { ascending: false });
 
         if (activeOnly) {
           query = query.eq('status', 'active');
         }
 
         const { data, error } = await query;
-        if (!error && data) {
-          return data.map((r: any) => ({
+        if (!error && data && data.length > 0) {
+          const cloudRentals: RentalSession[] = data.map((r: any) => ({
             id: r.id,
             rentalCode: r.rental_code,
             unitId: r.unit_id,
-            unitCode: r.units?.code || '',
-            unitName: r.units?.name || '',
+            unitCode: r.units?.code || (r.unit_id === '028ea2d7-c00a-410b-b660-d73dc2ff536b' ? 'PS-01' : 'PS-02'),
+            unitName: r.units?.name || (r.units?.code === 'PS-02' ? 'PS4 Unit 2' : 'PS4 Unit 1'),
             customerName: r.customer_name,
             customerPhone: r.customer_phone,
             tariffPackageId: r.tariff_package_id,
@@ -204,6 +204,12 @@ export const rentalService = {
             createdBy: r.created_by,
             createdAt: r.created_at,
           }));
+
+          const localAll = localEngine.getState().rentals;
+          const localFiltered = activeOnly ? localAll.filter((r) => r.status === 'active') : localAll;
+          const cloudCodes = new Set(cloudRentals.map((c) => c.rentalCode));
+          const localOnly = localFiltered.filter((l) => !cloudCodes.has(l.rentalCode));
+          return [...cloudRentals, ...localOnly];
         }
       } catch (e) {
         console.warn('Supabase fetch rentals failed', e);

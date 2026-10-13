@@ -167,6 +167,16 @@ class LocalEngine {
         if (!parsed.units || parsed.units.length === 0) {
           parsed.units = INITIAL_STATE.units;
         }
+        // Ensure initial excel data is present if stored list is empty
+        if (!parsed.rentals || parsed.rentals.length === 0) {
+          parsed.rentals = INITIAL_EXCEL_RENTALS;
+        }
+        if (!parsed.cashTransactions || parsed.cashTransactions.length === 0) {
+          parsed.cashTransactions = INITIAL_EXCEL_CASH;
+        }
+        if (!parsed.equipment || parsed.equipment.length === 0) {
+          parsed.equipment = INITIAL_EXCEL_EQUIPMENT;
+        }
         return { ...INITIAL_STATE, ...parsed };
       }
     } catch (e) {
@@ -182,6 +192,31 @@ class LocalEngine {
       console.error('Failed to save state to localStorage', e);
     }
     this.notify();
+  }
+
+  public saveState() {
+    this.persistState();
+  }
+
+  public addImportedRentals(rentals: RentalSession[]) {
+    const existingIds = new Set(this.state.rentals.map((r) => r.id));
+    const newRentals = rentals.filter((r) => !existingIds.has(r.id));
+    this.state.rentals.unshift(...newRentals);
+    this.persistState();
+  }
+
+  public addImportedCashTransactions(txs: CashTransaction[]) {
+    const existingIds = new Set(this.state.cashTransactions.map((c) => c.id));
+    const newTxs = txs.filter((c) => !existingIds.has(c.id));
+    this.state.cashTransactions.unshift(...newTxs);
+    this.persistState();
+  }
+
+  public addImportedEquipment(items: EquipmentItem[]) {
+    const existingIds = new Set(this.state.equipment.map((e) => e.id));
+    const newItems = items.filter((e) => !existingIds.has(e.id));
+    this.state.equipment.push(...newItems);
+    this.persistState();
   }
 
   public subscribe(listener: () => void): () => void {
