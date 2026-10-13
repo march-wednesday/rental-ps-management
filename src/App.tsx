@@ -15,6 +15,7 @@ import { RentalProvider } from '@/context/RentalContext';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { OwnerPinModal } from '@/components/auth/OwnerPinModal';
 import { OwnerRouteGuard } from '@/components/auth/OwnerRouteGuard';
+import { PwaInstallPrompt } from '@/components/pwa/PwaInstallPrompt';
 
 // Pages
 import { LoginPage } from '@/pages/LoginPage';
@@ -55,6 +56,7 @@ export default function App() {
             <AuthProvider>
               <RentalProvider>
                 <OwnerPinModal />
+                <PwaInstallPrompt />
                 <Routes>
                   {/* Public Route */}
                   <Route path="/login" element={<LoginPage />} />

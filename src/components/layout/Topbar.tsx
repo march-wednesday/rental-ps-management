@@ -18,6 +18,7 @@ import {
   KeyRound,
   Crown,
   Lock,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRental } from '@/context/RentalContext';
@@ -120,6 +121,15 @@ export const Topbar: React.FC<TopbarProps> = ({
           ) : (
             <Moon className="w-4 h-4 text-purple-600" />
           )}
+        </button>
+
+        {/* PWA INSTALL BUTTON (Pasang Aplikasi) */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('open-pwa-install'))}
+          title="Pasang / Install Aplikasi ke Layar Utama (HP / PC)"
+          className="p-2 rounded-xl text-slate-300 hover:text-cyan-300 bg-slate-900 border border-slate-800 transition-all hover:scale-105 active:scale-95"
+        >
+          <Download className="w-4 h-4 text-cyan-400" />
         </button>
 
         {/* Fast "Mulai Sewa" Button */}

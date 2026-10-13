@@ -17,7 +17,7 @@ export const rentalService = {
           .from('units')
           .select('*')
           .order('code', { ascending: true });
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           return data.map((u: any) => ({
             id: u.id,
             code: u.code,
@@ -35,6 +35,109 @@ export const rentalService = {
       }
     }
     return localEngine.getState().units;
+  },
+
+  // Create new PS unit (Tambah Unit PS)
+  async createUnit(params: {
+    code: string;
+    name: string;
+    consoleType: string;
+    hourlyRate: number;
+    status?: 'Tersedia' | 'Sedang Disewa' | 'Maintenance' | 'Nonaktif';
+    notes?: string;
+  }): Promise<{ success: boolean; unit?: PSUnit; error?: string }> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('units')
+          .insert({
+            code: params.code.trim().toUpperCase(),
+            name: params.name.trim(),
+            console_type: params.consoleType,
+            hourly_rate: params.hourlyRate,
+            status: params.status || 'Tersedia',
+            notes: params.notes || null,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          const unit: PSUnit = {
+            id: data.id,
+            code: data.code,
+            name: data.name,
+            consoleType: data.console_type,
+            status: data.status,
+            notes: data.notes,
+            hourlyRate: Number(data.hourly_rate),
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          };
+          try { localEngine.createUnit(params); } catch {}
+          return { success: true, unit };
+        }
+      } catch (e: any) {
+        console.warn('Supabase createUnit error, trying local:', e);
+      }
+    }
+
+    try {
+      const unit = localEngine.createUnit(params);
+      return { success: true, unit };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Gagal menambahkan unit' };
+    }
+  },
+
+  // Update existing PS unit
+  async updateUnit(unitId: string, params: Partial<PSUnit>): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured) {
+      try {
+        const payload: any = {};
+        if (params.name !== undefined) payload.name = params.name;
+        if (params.consoleType !== undefined) payload.console_type = params.consoleType;
+        if (params.hourlyRate !== undefined) payload.hourly_rate = params.hourlyRate;
+        if (params.status !== undefined) payload.status = params.status;
+        if (params.notes !== undefined) payload.notes = params.notes;
+
+        const { error } = await supabase.from('units').update(payload).eq('id', unitId);
+        if (!error) {
+          try { localEngine.updateUnit(unitId, params); } catch {}
+          return { success: true };
+        }
+      } catch (e: any) {
+        console.warn('Supabase updateUnit error:', e);
+      }
+    }
+
+    try {
+      localEngine.updateUnit(unitId, params);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Gagal memperbarui unit' };
+    }
+  },
+
+  // Delete PS unit
+  async deleteUnit(unitId: string): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.from('units').delete().eq('id', unitId);
+        if (!error) {
+          try { localEngine.deleteUnit(unitId); } catch {}
+          return { success: true };
+        }
+      } catch (e: any) {
+        console.warn('Supabase deleteUnit error:', e);
+      }
+    }
+
+    try {
+      localEngine.deleteUnit(unitId);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Gagal menghapus unit' };
+    }
   },
 
   // Query tariff packages

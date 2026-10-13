@@ -34,6 +34,14 @@ export const StartRentalModal: React.FC<StartRentalModalProps> = ({
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
+  React.useEffect(() => {
+    if (defaultUnitId && units.some((u) => u.id === defaultUnitId)) {
+      setSelectedUnitId(defaultUnitId);
+    } else if (availableUnits.length > 0 && (!selectedUnitId || !units.some(u => u.id === selectedUnitId))) {
+      setSelectedUnitId(availableUnits[0].id);
+    }
+  }, [defaultUnitId, units]);
+
   // Selected tariff info
   const selectedTariff = tariffPackages.find((t) => t.id === selectedTariffId);
   const targetUnit = units.find((u) => u.id === selectedUnitId);

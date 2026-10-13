@@ -1,16 +1,18 @@
 // ==============================================================================
 // RENTAL PS MANAGEMENT SYSTEM - PENYEWAAN & LIVE TIMER PAGE
-// Operasional utama kasir: PS-01 & PS-02 dengan timer presisi server
+// Operasional utama kasir: PS-01, PS-02, dan konsol tambahan dengan timer presisi server
 // ==============================================================================
 
 import React, { useState } from 'react';
 import { useRental } from '@/context/RentalContext';
+import { useAuth } from '@/context/AuthContext';
 import { UnitCard } from '@/features/rental/UnitCard';
 import { StartRentalModal } from '@/features/rental/StartRentalModal';
 import { ExtendRentalModal } from '@/features/rental/ExtendRentalModal';
 import { PaymentModal } from '@/features/rental/PaymentModal';
+import { ManageUnitsModal } from '@/features/rental/ManageUnitsModal';
 import { RentalSession } from '@/types';
-import { Plus, Radio, Clock, ShieldAlert } from 'lucide-react';
+import { Plus, Radio, Clock, ShieldAlert, Gamepad2, Settings2 } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 
 export const RentalPage: React.FC = () => {
@@ -21,16 +23,22 @@ export const RentalPage: React.FC = () => {
     completeRental,
     cancelRental,
   } = useRental();
+  const { isOwner, openPinModal } = useAuth();
 
   // Modals state
-  const [startRentalUnitId, setStartRentalUnitId] = useState<string | null>(null);
+  const [isStartModalOpen, setIsStartModalOpen] = useState<boolean>(false);
+  const [selectedStartUnitId, setSelectedStartUnitId] = useState<string | undefined>(undefined);
+  const [isManageUnitsOpen, setIsManageUnitsOpen] = useState<boolean>(false);
+
   const [extendTargetRental, setExtendTargetRental] = useState<RentalSession | null>(null);
   const [paymentTargetRental, setPaymentTargetRental] = useState<RentalSession | null>(null);
   const [cancelTargetRental, setCancelTargetRental] = useState<RentalSession | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  const handleStart = (unitId: string) => {
-    setStartRentalUnitId(unitId);
+  const handleStart = (unitId?: string) => {
+    const targetUnit = unitId || units.find((u) => u.status === 'Tersedia')?.id || units[0]?.id;
+    setSelectedStartUnitId(targetUnit);
+    setIsStartModalOpen(true);
   };
 
   const handleExtend = (rental: RentalSession) => {
@@ -52,6 +60,14 @@ export const RentalPage: React.FC = () => {
     setCancelTargetRental(null);
   };
 
+  const handleManageUnits = () => {
+    if (!isOwner) {
+      openPinModal();
+    } else {
+      setIsManageUnitsOpen(true);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -69,17 +85,33 @@ export const RentalPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setStartRentalUnitId(units[0]?.id || '')}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-950/50 transition-all hover:scale-[1.02] shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Mulai Sewa Baru</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {/* Kelola / Tambah PS Button */}
+          <button
+            type="button"
+            onClick={handleManageUnits}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-all hover:scale-[1.02] shrink-0"
+            title="Kelola daftar unit atau tambah PlayStation baru"
+          >
+            <Gamepad2 className="w-4 h-4 text-purple-400" />
+            <span>Kelola Unit PS</span>
+          </button>
+
+          {/* Mulai Sewa Baru Button */}
+          <button
+            type="button"
+            id="btn-mulai-sewa-baru"
+            onClick={() => handleStart()}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-purple-950/50 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Mulai Sewa Baru</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Grid: PS-01 & PS-02 Unit Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Main Grid: PlayStation Unit Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {units.map((unit) => {
           const activeRental = activeRentals.find((r) => r.unitId === unit.id);
           const timerCalc = activeRental ? timerCalculations[activeRental.id] : undefined;
@@ -90,7 +122,7 @@ export const RentalPage: React.FC = () => {
               unit={unit}
               activeRental={activeRental}
               timerCalc={timerCalc}
-              onStartRental={handleStart}
+              onStartRental={() => handleStart(unit.id)}
               onExtendRental={handleExtend}
               onCompleteRental={completeRental}
               onCancelRental={handleCancelClick}
@@ -112,11 +144,18 @@ export const RentalPage: React.FC = () => {
       </div>
 
       {/* MODALS */}
-      {startRentalUnitId && (
+      {isStartModalOpen && (
         <StartRentalModal
-          isOpen={Boolean(startRentalUnitId)}
-          onClose={() => setStartRentalUnitId(null)}
-          defaultUnitId={startRentalUnitId}
+          isOpen={isStartModalOpen}
+          onClose={() => setIsStartModalOpen(false)}
+          defaultUnitId={selectedStartUnitId}
+        />
+      )}
+
+      {isManageUnitsOpen && (
+        <ManageUnitsModal
+          isOpen={isManageUnitsOpen}
+          onClose={() => setIsManageUnitsOpen(false)}
         />
       )}
 

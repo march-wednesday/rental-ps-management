@@ -15,6 +15,11 @@ import {
   UserProfile,
   ImportBatchSummary,
 } from '@/types';
+import {
+  INITIAL_EXCEL_RENTALS,
+  INITIAL_EXCEL_CASH,
+  INITIAL_EXCEL_EQUIPMENT,
+} from './excelInitialData';
 
 const STORAGE_KEY = 'rental_ps_database_v1';
 
@@ -114,95 +119,10 @@ const INITIAL_STATE: DatabaseState = {
       sortOrder: 4,
     },
   ],
-  rentals: [],
+  rentals: INITIAL_EXCEL_RENTALS,
   payments: [],
-  cashTransactions: [],
-  equipment: [
-    {
-      id: 'eq-01',
-      name: 'Stabilizer 1.000 VA',
-      specification: 'Matsunaga 1000W / Servo Motor System',
-      quantity: 2,
-      unit: 'Unit',
-      unitPrice: 350000,
-      totalPrice: 700000,
-      wattage: 20,
-      notes: 'Pengaman tegangan PS4 dan TV',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-02',
-      name: 'Kipas dinding',
-      specification: 'Maspion 16 Inch Dinding (Wall Fan)',
-      quantity: 2,
-      unit: 'Unit',
-      unitPrice: 285000,
-      totalPrice: 570000,
-      wattage: 55,
-      notes: 'Sirkulasi udara area rental',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-03',
-      name: 'Stopkontak heavy duty',
-      specification: 'Broco 4 Lubang + Saklar Arde',
-      quantity: 3,
-      unit: 'Unit',
-      unitPrice: 65000,
-      totalPrice: 195000,
-      wattage: 0,
-      notes: 'Titik daya colokan konsol & TV',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-04',
-      name: 'Kabel listrik',
-      specification: 'Supreme NYM 2x1.5mm',
-      quantity: 30,
-      unit: 'Meter',
-      unitPrice: 14000,
-      totalPrice: 420000,
-      wattage: 0,
-      notes: 'Instalasi jalur utama rental',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-05',
-      name: 'Steker heavy duty',
-      specification: 'Broco Steker Arde Bengkok 16A',
-      quantity: 4,
-      unit: 'Pcs',
-      unitPrice: 18000,
-      totalPrice: 72000,
-      wattage: 0,
-      notes: 'Steker tahan panas',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-06',
-      name: 'Lampu LED',
-      specification: 'Philips LED Bulb 14 Watt Cool Daylight',
-      quantity: 3,
-      unit: 'Pcs',
-      unitPrice: 52000,
-      totalPrice: 156000,
-      wattage: 14,
-      notes: 'Penerangan ruangan utama',
-      category: 'Peralatan Listrik',
-    },
-    {
-      id: 'eq-07',
-      name: 'Aksesori instalasi',
-      specification: 'Klem kabel, isolasi unibel, paku beton, baut',
-      quantity: 1,
-      unit: 'Paket',
-      unitPrice: 75000,
-      totalPrice: 75000,
-      wattage: 0,
-      notes: 'Kelengkapan pasang listrik',
-      category: 'Peralatan Listrik',
-    },
-  ],
+  cashTransactions: INITIAL_EXCEL_CASH,
+  equipment: INITIAL_EXCEL_EQUIPMENT,
   auditLogs: [
     {
       id: 'log-init',
@@ -826,6 +746,43 @@ class LocalEngine {
     if (this.state.auditLogs.length > 500) {
       this.state.auditLogs = this.state.auditLogs.slice(0, 500);
     }
+  }
+
+  // ==========================================
+  // PLAYSTATION UNIT MANAGEMENT
+  // ==========================================
+  public createUnit(params: {
+    code: string;
+    name: string;
+    consoleType: string;
+    hourlyRate: number;
+    status?: 'Tersedia' | 'Sedang Disewa' | 'Maintenance' | 'Nonaktif';
+    notes?: string;
+  }): PSUnit {
+    const newUnit: PSUnit = {
+      id: `unit-${Date.now()}`,
+      code: params.code.trim().toUpperCase(),
+      name: params.name.trim(),
+      consoleType: params.consoleType,
+      status: params.status || 'Tersedia',
+      notes: params.notes,
+      hourlyRate: params.hourlyRate,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.state.units.push(newUnit);
+    this.persistState();
+    return newUnit;
+  }
+
+  public deleteUnit(unitId: string): boolean {
+    const index = this.state.units.findIndex((u) => u.id === unitId || u.code === unitId);
+    if (index >= 0) {
+      this.state.units.splice(index, 1);
+      this.persistState();
+      return true;
+    }
+    return false;
   }
 
   // ==========================================

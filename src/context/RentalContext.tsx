@@ -41,6 +41,16 @@ interface RentalContextType {
     paymentMethod: PaymentMethod;
     notes?: string;
   }) => Promise<{ success: boolean; error?: string }>;
+  createUnit: (params: {
+    code: string;
+    name: string;
+    consoleType: string;
+    hourlyRate: number;
+    status?: 'Tersedia' | 'Sedang Disewa' | 'Maintenance' | 'Nonaktif';
+    notes?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  updateUnit: (unitId: string, params: Partial<PSUnit>) => Promise<{ success: boolean; error?: string }>;
+  deleteUnit: (unitId: string) => Promise<{ success: boolean; error?: string }>;
   isSubmitting: boolean;
 }
 
@@ -257,6 +267,55 @@ export const RentalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const createUnit = async (params: {
+    code: string;
+    name: string;
+    consoleType: string;
+    hourlyRate: number;
+    status?: 'Tersedia' | 'Sedang Disewa' | 'Maintenance' | 'Nonaktif';
+    notes?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    setIsSubmitting(true);
+    const res = await rentalService.createUnit(params);
+    if (res.success) {
+      success('Unit Berhasil Ditambahkan', `Unit ${params.code} (${params.name}) telah aktif.`);
+      await loadData();
+      setIsSubmitting(false);
+      return { success: true };
+    } else {
+      setIsSubmitting(false);
+      return { success: false, error: res.error || 'Gagal menambahkan unit' };
+    }
+  };
+
+  const updateUnit = async (unitId: string, params: Partial<PSUnit>): Promise<{ success: boolean; error?: string }> => {
+    setIsSubmitting(true);
+    const res = await rentalService.updateUnit(unitId, params);
+    if (res.success) {
+      success('Unit Diperbarui', 'Data unit PlayStation berhasil diperbarui.');
+      await loadData();
+      setIsSubmitting(false);
+      return { success: true };
+    } else {
+      setIsSubmitting(false);
+      return { success: false, error: res.error || 'Gagal memperbarui unit' };
+    }
+  };
+
+  const deleteUnit = async (unitId: string): Promise<{ success: boolean; error?: string }> => {
+    setIsSubmitting(true);
+    const res = await rentalService.deleteUnit(unitId);
+    if (res.success) {
+      info('Unit Dihapus', 'Unit telah dihapus dari daftar sistem.');
+      await loadData();
+      setIsSubmitting(false);
+      return { success: true };
+    } else {
+      setIsSubmitting(false);
+      return { success: false, error: res.error || 'Gagal menghapus unit' };
+    }
+  };
+
   return (
     <RentalContext.Provider
       value={{
@@ -270,6 +329,9 @@ export const RentalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         completeRental,
         cancelRental,
         recordPayment,
+        createUnit,
+        updateUnit,
+        deleteUnit,
         isSubmitting,
       }}
     >

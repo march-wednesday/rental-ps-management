@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { financeService } from '@/services/financeService';
 import { excelService } from '@/services/excelService';
+import { localEngine } from '@/lib/mockEngine';
 import { formatRupiah, formatNumber } from '@/utils/formatters';
 import {
   BarChart3,
@@ -171,6 +172,76 @@ export const ReportsPage: React.FC = () => {
               {formatRupiah(summary.cashBalance)}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* 6. BREAKDOWN KINERJA PER UNIT KONSOL PLAYSTATION */}
+      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-white tracking-wide">
+              Kontribusi Omzet & Utilisasi per Unit Konsol
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Rincian pendapatan dan total jam sewa yang dihasilkan masing-masing PlayStation.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-purple-300 font-semibold bg-purple-950/40 border border-purple-800/40 px-2.5 py-1 rounded-xl">
+            {localEngine.getState().units.length} Unit Terdaftar
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {localEngine.getState().units.map((unit) => {
+            const unitRentals = localEngine.getState().rentals.filter(
+              (r) => r.unitId === unit.id || r.unitCode === unit.code
+            );
+            const unitOmzet = unitRentals.reduce((sum, r) => sum + (r.totalPrice || 0), 0);
+            const unitMinutes = unitRentals.reduce((sum, r) => sum + (r.durationMinutes || 0), 0);
+            const unitHours = (unitMinutes / 60).toFixed(1);
+
+            return (
+              <div
+                key={unit.id}
+                className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 hover:border-purple-500/30 transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center font-bold text-xs text-purple-300">
+                      {unit.code}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">{unit.name}</div>
+                      <div className="text-[10px] text-slate-400">{unit.consoleType} • {formatRupiah(unit.hourlyRate)}/jam</div>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                    unit.status === 'Tersedia'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                      : 'bg-purple-500/15 border-purple-500/30 text-purple-300'
+                  }`}>
+                    {unit.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 font-mono text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-sans block">Total Sesi</span>
+                    <span className="text-white font-bold">{unitRentals.length} Sesi</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-sans block">Jam Main</span>
+                    <span className="text-cyan-300 font-bold">{unitHours} Jam</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-sans text-[11px]">Total Omzet:</span>
+                  <span className="font-mono font-bold text-emerald-400">{formatRupiah(unitOmzet)}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
