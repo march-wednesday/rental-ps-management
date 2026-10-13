@@ -351,6 +351,10 @@ export const rentalService = {
         if (updates.customerName !== undefined) payload.customer_name = updates.customerName;
         if (updates.customerPhone !== undefined) payload.customer_phone = updates.customerPhone || null;
         if (updates.durationMinutes !== undefined) payload.duration_minutes = updates.durationMinutes;
+        if (updates.startTime !== undefined) payload.start_time = updates.startTime;
+        if (updates.targetEndTime !== undefined) payload.target_end_time = updates.targetEndTime;
+        if (updates.actualEndTime !== undefined) payload.actual_end_time = updates.actualEndTime;
+        if (updates.createdAt !== undefined) payload.created_at = updates.createdAt;
         if (updates.totalPrice !== undefined) payload.total_price = updates.totalPrice;
         if (updates.totalPaid !== undefined) payload.total_paid = updates.totalPaid;
         if (updates.paymentStatus !== undefined) payload.payment_status = updates.paymentStatus;

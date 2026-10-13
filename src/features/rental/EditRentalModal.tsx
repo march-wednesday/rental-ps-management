@@ -1,6 +1,6 @@
 // ==============================================================================
 // RENTAL PS MANAGEMENT SYSTEM - EDIT RENTAL MODAL
-// Allows owner/cashier to edit logbook sessions & change payment status to Lunas
+// Allows owner/cashier to edit logbook sessions, dates/times, & payment status
 // ==============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -10,13 +10,31 @@ import { useToast } from '@/context/ToastContext';
 import { rentalService } from '@/services/rentalService';
 import { RentalSession, PaymentStatus, RentalStatus } from '@/types';
 import { formatRupiah } from '@/utils/formatters';
-import { CheckCircle2, Save, X, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Save, X, AlertCircle, Calendar, Clock, DollarSign, User } from 'lucide-react';
 
 interface EditRentalModalProps {
   isOpen: boolean;
   onClose: () => void;
   rental: RentalSession | null;
   onSuccess?: () => void;
+}
+
+function extractDateAndTimeString(isoString?: string): { dateStr: string; timeStr: string } {
+  if (!isoString) {
+    const today = new Date().toISOString().split('T')[0];
+    return { dateStr: today, timeStr: '12:00' };
+  }
+  try {
+    const parts = isoString.split('T');
+    const dateStr = parts[0] || new Date().toISOString().split('T')[0];
+    let timeStr = '12:00';
+    if (parts[1]) {
+      timeStr = parts[1].substring(0, 5);
+    }
+    return { dateStr, timeStr };
+  } catch {
+    return { dateStr: new Date().toISOString().split('T')[0], timeStr: '12:00' };
+  }
 }
 
 export const EditRentalModal: React.FC<EditRentalModalProps> = ({
@@ -31,6 +49,9 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [selectedUnitCode, setSelectedUnitCode] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [sessionDate, setSessionDate] = useState('2026-10-09');
+  const [startTime, setStartTime] = useState('12:00');
+  const [endTime, setEndTime] = useState('13:00');
   const [totalPrice, setTotalPrice] = useState(10000);
   const [totalPaid, setTotalPaid] = useState(10000);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('Lunas');
@@ -43,6 +64,13 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
       setCustomerName(rental.customerName || '');
       setSelectedUnitCode(rental.unitCode || 'PS-01');
       setDurationMinutes(rental.durationMinutes || 60);
+
+      const startParsed = extractDateAndTimeString(rental.startTime);
+      const endParsed = extractDateAndTimeString(rental.targetEndTime || rental.actualEndTime);
+      setSessionDate(startParsed.dateStr);
+      setStartTime(startParsed.timeStr);
+      setEndTime(endParsed.timeStr);
+
       setTotalPrice(rental.totalPrice || 10000);
       setTotalPaid(rental.totalPaid !== undefined ? rental.totalPaid : rental.totalPrice);
       setPaymentStatus(rental.paymentStatus || 'Lunas');
@@ -69,9 +97,17 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
       return;
     }
 
+    if (!sessionDate) {
+      error('Tanggal Wajib Diisi', 'Silakan tentukan tanggal penggunaan konsol.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const selectedUnit = units.find((u) => u.code === selectedUnitCode);
+
+      const startIso = `${sessionDate}T${startTime || '12:00'}:00+08:00`;
+      const endIso = `${sessionDate}T${endTime || '13:00'}:00+08:00`;
 
       const res = await rentalService.updateRentalSession(rental.id, {
         customerName: customerName.trim(),
@@ -79,6 +115,10 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
         unitName: selectedUnit?.name || (selectedUnitCode === 'PS-02' ? 'PS4 Unit 2' : 'PS4 Unit 1'),
         unitId: selectedUnit?.id || (selectedUnitCode === 'PS-02' ? 'unit-ps-02' : 'unit-ps-01'),
         durationMinutes: Number(durationMinutes) || 60,
+        startTime: startIso,
+        targetEndTime: endIso,
+        actualEndTime: status === 'completed' ? endIso : undefined,
+        createdAt: startIso,
         totalPrice: Number(totalPrice) || 0,
         totalPaid: Number(totalPaid) || 0,
         paymentStatus,
@@ -87,7 +127,7 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
       });
 
       if (res.success) {
-        success('Data Berhasil Diperbarui', `Sesi ${rental.rentalCode} berhasil disimpan.`);
+        success('Data Berhasil Diperbarui', `Sesi ${rental.rentalCode} tanggal ${sessionDate} berhasil disimpan.`);
         if (onSuccess) onSuccess();
         onClose();
       } else {
@@ -105,7 +145,7 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={`Edit Sesi Rental: ${rental.rentalCode}`}
-      description="Ubah status pembayaran, data pelanggan, tarif, atau catatan logbook."
+      description="Ubah tanggal penggunaan, waktu, status pembayaran, atau data pelanggan lama."
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -127,11 +167,62 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
           </div>
         )}
 
+        {/* TANGGAL & WAKTU PENGGUNAAN (KOREKSI DATA LAMA) */}
+        <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-purple-300">
+            <Calendar className="w-4 h-4 text-purple-400" />
+            <span>Koreksi Tanggal & Jam Penggunaan Konsol</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                Tanggal Bermain
+              </label>
+              <input
+                type="date"
+                value={sessionDate}
+                onChange={(e) => setSessionDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                Jam Mulai
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                Jam Selesai
+              </label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 italic">
+            * Mengubah tanggal bermain akan memperbarui posisi arsip di Logbook Harian dan Buku Kas periode yang bersangkutan.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Customer Name */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Nama Pelanggan
+            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1">
+              <User className="w-3.5 h-3.5 text-slate-400" />
+              <span>Nama Pelanggan</span>
             </label>
             <input
               type="text"
@@ -162,8 +253,9 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
 
           {/* Duration */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Durasi Sewa (Menit)
+            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>Durasi Sewa (Menit)</span>
             </label>
             <input
               type="number"
@@ -193,8 +285,9 @@ export const EditRentalModal: React.FC<EditRentalModalProps> = ({
 
           {/* Total Tagihan (Biaya) */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Total Tagihan (Rp)
+            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1">
+              <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+              <span>Total Tagihan (Rp)</span>
             </label>
             <input
               type="number"

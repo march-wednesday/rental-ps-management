@@ -261,7 +261,7 @@ export const LogbookPage: React.FC = () => {
                 <th className="py-3 px-3 text-center">Status Sesi</th>
                 <th className="py-3 px-3 text-center">Status Bayar</th>
                 <th className="py-3 px-3 text-center">Catatan</th>
-                <th className="py-3 px-3 text-center">Aksi</th>
+                <th className="py-3 px-3 text-center sticky right-0 bg-slate-950/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.3)]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -275,8 +275,19 @@ export const LogbookPage: React.FC = () => {
                 filtered.map((r, idx) => (
                   <tr key={r.id} className="hover:bg-slate-900/40 transition-colors">
                     <td className="py-3 px-3 text-slate-500 font-mono">{idx + 1}</td>
-                    <td className="py-3 px-3 font-mono text-purple-300 font-semibold">
-                      {r.rentalCode}
+                    <td className="py-3 px-3 font-mono font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRental(r);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="text-purple-300 hover:text-purple-200 hover:underline flex items-center gap-1 group text-left cursor-pointer"
+                        title="Klik untuk Edit Tanggal & Data Sesi"
+                      >
+                        <span>{r.rentalCode}</span>
+                        <Edit3 className="w-3 h-3 text-purple-400/60 group-hover:text-purple-300 transition-colors" />
+                      </button>
                     </td>
                     <td className="py-3 px-3">
                       <span className="font-mono text-cyan-300 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">
@@ -337,7 +348,7 @@ export const LogbookPage: React.FC = () => {
                     <td className="py-3 px-3 text-slate-400 text-[11px]">
                       {r.notes || '-'}
                     </td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-3 px-3 text-center sticky right-0 bg-slate-900/95 backdrop-blur-sm z-10 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.3)]">
                       <div className="flex items-center justify-center gap-1.5">
                         {r.paymentStatus !== 'Lunas' && (
                           <button
@@ -352,14 +363,16 @@ export const LogbookPage: React.FC = () => {
                         )}
                         <button
                           type="button"
+                          id={`edit-rental-btn-${idx}`}
                           onClick={() => {
                             setEditingRental(r);
                             setIsEditModalOpen(true);
                           }}
-                          title="Edit Data Sesi & Status"
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all hover:scale-105 active:scale-95"
+                          title="Edit Data Sesi, Tanggal & Status"
+                          className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all hover:scale-105 active:scale-95 flex items-center gap-1 text-[11px]"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Edit</span>
                         </button>
                       </div>
                     </td>

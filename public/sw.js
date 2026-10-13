@@ -45,6 +45,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // On localhost/development, bypass cache completely to avoid stale bundles
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Let Supabase API requests pass directly to network
   if (event.request.url.includes('supabase.co')) {
     event.respondWith(
