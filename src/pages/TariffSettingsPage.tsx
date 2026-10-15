@@ -3,7 +3,7 @@
 // ==============================================================================
 
 import React, { useState } from 'react';
-import { localEngine } from '@/lib/mockEngine';
+import { rentalService } from '@/services/rentalService';
 import { useRental } from '@/context/RentalContext';
 import { useAuth } from '@/context/AuthContext';
 import { TariffPackage } from '@/types';
@@ -15,13 +15,14 @@ import { useToast } from '@/context/ToastContext';
 export const TariffSettingsPage: React.FC = () => {
   const { isOwner } = useAuth();
   const { tariffPackages, units, refreshData } = useRental();
-  const { success, warning } = useToast();
+  const { success, warning, error } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editPackage, setEditPackage] = useState<TariffPackage | null>(null);
   const [name, setName] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [price, setPrice] = useState(10000);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenAdd = () => {
     if (!isOwner) {
@@ -47,45 +48,65 @@ export const TariffSettingsPage: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const current = [...tariffPackages];
-    if (editPackage) {
-      const idx = current.findIndex((p) => p.id === editPackage.id);
-      if (idx !== -1) {
-        current[idx] = {
-          ...editPackage,
+    setIsSaving(true);
+    try {
+      if (editPackage) {
+        const res = await rentalService.updateTariffPackage(editPackage.id, {
           name: name.trim(),
           durationMinutes,
           price,
-        };
+        });
+        if (res.success) {
+          success('Paket Diperbarui', `${name} berhasil diubah.`);
+        } else {
+          error('Gagal Mengubah Paket', res.error || 'Terjadi kesalahan.');
+        }
+      } else {
+        const res = await rentalService.createTariffPackage({
+          name: name.trim(),
+          durationMinutes,
+          price,
+        });
+        if (res.success) {
+          success('Paket Ditambahkan', `${name} berhasil disimpan ke database.`);
+        } else {
+          error('Gagal Menambah Paket', res.error || 'Terjadi kesalahan.');
+        }
       }
-      success('Paket Diperbarui', `${name} berhasil diubah.`);
-    } else {
-      current.push({
-        id: `pkg-${Date.now()}`,
-        name: name.trim(),
-        durationMinutes,
-        price,
-        isActive: true,
-        sortOrder: current.length + 1,
-      });
-      success('Paket Ditambahkan', `${name} berhasil ditambahkan.`);
+      await refreshData();
+      setModalOpen(false);
+    } catch (err: any) {
+      error('Kesalahan Sistem', err.message || 'Gagal menyimpan paket.');
+    } finally {
+      setIsSaving(false);
     }
-
-    localEngine.saveTariffPackages(current);
-    refreshData();
-    setModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (pkg: TariffPackage) => {
     if (!isOwner) return;
-    const filtered = tariffPackages.filter((p) => p.id !== id);
-    localEngine.saveTariffPackages(filtered);
-    refreshData();
-    success('Paket Dihapus', 'Paket sewa dihapus.');
+    if (tariffPackages.length <= 1) {
+      warning('Tidak Dapat Menghapus', 'Minimal harus ada 1 paket tarif sewa yang aktif.');
+      return;
+    }
+    if (!window.confirm(`Yakin ingin menghapus paket "${pkg.name}" (${formatRupiah(pkg.price)})?`)) {
+      return;
+    }
+
+    try {
+      const res = await rentalService.deleteTariffPackage(pkg.id);
+      if (res.success) {
+        success('Paket Dihapus', `Paket "${pkg.name}" berhasil dihapus.`);
+        await refreshData();
+      } else {
+        error('Gagal Menghapus', res.error || 'Terjadi kesalahan saat menghapus paket.');
+      }
+    } catch (err: any) {
+      error('Kesalahan Sistem', err.message || 'Gagal menghapus paket.');
+    }
   };
 
   return (
@@ -159,9 +180,9 @@ export const TariffSettingsPage: React.FC = () => {
                 >
                   <Edit className="w-3.5 h-3.5" />
                 </button>
-                {tariffPackages.length > 2 && (
+                {tariffPackages.length > 1 && (
                   <button
-                    onClick={() => handleDelete(pkg.id)}
+                    onClick={() => handleDelete(pkg)}
                     className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
                     title="Hapus paket"
                   >

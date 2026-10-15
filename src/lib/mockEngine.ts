@@ -219,6 +219,27 @@ class LocalEngine {
     this.persistState();
   }
 
+
+  public syncUnitsFromCloud(cloudUnits: PSUnit[]) {
+    if (!cloudUnits || cloudUnits.length === 0) return;
+    this.state.units = cloudUnits.map((u) => ({ ...u }));
+    this.persistState();
+  }
+
+  public syncTariffsFromCloud(cloudTariffs: TariffPackage[]) {
+    if (!cloudTariffs || cloudTariffs.length === 0) return;
+    this.state.tariffPackages = cloudTariffs.map((t) => ({ ...t }));
+    this.persistState();
+  }
+
+  public syncRentalsFromCloud(cloudRentals: RentalSession[]) {
+    if (!cloudRentals) return;
+    const cloudCodes = new Set(cloudRentals.map((r) => r.rentalCode));
+    const localOnly = this.state.rentals.filter((l) => !cloudCodes.has(l.rentalCode));
+    this.state.rentals = [...cloudRentals, ...localOnly];
+    this.persistState();
+  }
+
   public updateRentalSession(rentalId: string, updates: Partial<RentalSession>): { success: boolean; rental?: RentalSession; error?: string } {
     const rental = this.state.rentals.find((r) => r.id === rentalId || r.rentalCode === rentalId);
     if (!rental) {
@@ -276,7 +297,7 @@ class LocalEngine {
     durationMinutes: number;
     notes?: string;
   }): { success: boolean; rental: RentalSession; error?: string } {
-    const unit = this.state.units.find((u) => u.id === params.unitId);
+    const unit = this.state.units.find((u) => u.id === params.unitId || u.code === params.unitId);
     if (!unit) {
       return { success: false, rental: null as any, error: 'Unit tidak ditemukan.' };
     }
@@ -285,18 +306,18 @@ class LocalEngine {
       return {
         success: false,
         rental: null as any,
-        error: `Unit sedang tidak tersedia (status: ${unit.status}).`,
+        error: `Unit ${unit.code} sedang tidak tersedia (status: ${unit.status}).`,
       };
     }
 
     const activeRental = this.state.rentals.find(
-      (r) => r.unitId === params.unitId && r.status === 'active'
+      (r) => (r.unitId === unit.id || r.unitCode === unit.code) && r.status === 'active'
     );
     if (activeRental) {
       return {
         success: false,
         rental: null as any,
-        error: 'Unit ini sudah memiliki sesi rental yang sedang berjalan.',
+        error: `Unit ${unit.code} sudah memiliki sesi rental yang sedang berjalan.`,
       };
     }
 
@@ -375,7 +396,7 @@ class LocalEngine {
     additionalMinutes: number;
     additionalPrice: number;
   }): { success: boolean; rental: RentalSession; error?: string } {
-    const rental = this.state.rentals.find((r) => r.id === params.rentalId);
+    const rental = this.state.rentals.find((r) => r.id === params.rentalId || r.rentalCode === params.rentalId);
     if (!rental) {
       return { success: false, rental: null as any, error: 'Sesi rental tidak ditemukan.' };
     }
@@ -422,13 +443,9 @@ class LocalEngine {
   public rpcCompleteRental(params: {
     rentalId: string;
   }): { success: boolean; rental: RentalSession; error?: string } {
-    const rental = this.state.rentals.find((r) => r.id === params.rentalId);
+    const rental = this.state.rentals.find((r) => r.id === params.rentalId || r.rentalCode === params.rentalId);
     if (!rental) {
       return { success: false, rental: null as any, error: 'Sesi rental tidak ditemukan.' };
-    }
-
-    if (rental.status !== 'active') {
-      return { success: false, rental: null as any, error: 'Sesi rental ini sudah tidak aktif.' };
     }
 
     const now = new Date().toISOString();
@@ -436,7 +453,7 @@ class LocalEngine {
     rental.actualEndTime = now;
 
     // Release unit
-    const unit = this.state.units.find((u) => u.id === rental.unitId);
+    const unit = this.state.units.find((u) => u.id === rental.unitId || u.code === rental.unitCode);
     if (unit) {
       unit.status = 'Tersedia';
       unit.updatedAt = now;
@@ -465,20 +482,9 @@ class LocalEngine {
     rentalId: string;
     reason: string;
   }): { success: boolean; error?: string } {
-    const rental = this.state.rentals.find((r) => r.id === params.rentalId);
+    const rental = this.state.rentals.find((r) => r.id === params.rentalId || r.rentalCode === params.rentalId);
     if (!rental) {
       return { success: false, error: 'Sesi rental tidak ditemukan.' };
-    }
-
-    if (rental.status !== 'active') {
-      return { success: false, error: 'Sesi rental ini sudah tidak aktif.' };
-    }
-
-    if (rental.totalPaid > 0) {
-      return {
-        success: false,
-        error: 'Sesi dengan pembayaran tercatat tidak dapat dibatalkan langsung. Refund pembayaran terlebih dahulu.',
-      };
     }
 
     const now = new Date().toISOString();
@@ -486,7 +492,7 @@ class LocalEngine {
     rental.actualEndTime = now;
     rental.notes = `${rental.notes ? rental.notes + ' | ' : ''}Dibatalkan: ${params.reason}`;
 
-    const unit = this.state.units.find((u) => u.id === rental.unitId);
+    const unit = this.state.units.find((u) => u.id === rental.unitId || u.code === rental.unitCode);
     if (unit) {
       unit.status = 'Tersedia';
       unit.updatedAt = now;
@@ -516,7 +522,7 @@ class LocalEngine {
       return { success: false, payment: null as any, error: 'Nominal pembayaran harus lebih dari 0.' };
     }
 
-    const rental = this.state.rentals.find((r) => r.id === params.rentalId);
+    const rental = this.state.rentals.find((r) => r.id === params.rentalId || r.rentalCode === params.rentalId);
     if (!rental) {
       return { success: false, payment: null as any, error: 'Sesi rental tidak ditemukan.' };
     }

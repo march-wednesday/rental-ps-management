@@ -1,6 +1,7 @@
 // ==============================================================================
 // RENTAL PS MANAGEMENT SYSTEM - FINANCE SERVICE
 // Handles payments, cash book (Buku Kas), expenses, running balance, profit/loss
+// Bridges Supabase & LocalEngine with transparent bidirectional synchronization
 // ==============================================================================
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -54,6 +55,12 @@ export const financeService = {
             createdBy: t.created_by,
             createdAt: t.created_at,
           }));
+
+          // Sync into localEngine so local queries & getSummary() have complete data
+          const cloudIds = new Set(list.map((t) => t.id));
+          const localOnly = localEngine.getState().cashTransactions.filter((l) => !cloudIds.has(l.id));
+          localEngine.getState().cashTransactions = [...list, ...localOnly];
+          localEngine.saveState();
         }
       } catch (e) {
         console.warn('Supabase fetch cash transactions failed', e);
@@ -118,23 +125,70 @@ export const financeService = {
     paymentMethod: PaymentMethod;
     notes?: string;
   }): Promise<{ success: boolean; payment?: PaymentRecord; error?: string }> {
-    if (isSupabaseConfigured) {
+    const localRes = localEngine.rpcRecordPayment(params);
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.rentalId)) {
       try {
-        const { error } = await supabase.rpc('rpc_record_payment', {
+        const { error: rpcErr } = await supabase.rpc('rpc_record_payment', {
           p_rental_id: params.rentalId,
           p_amount: params.amount,
           p_payment_method: params.paymentMethod,
           p_notes: params.notes || null,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
+
+        if (rpcErr) {
+          console.warn('Supabase rpc_record_payment error, using direct insert fallback:', rpcErr);
+          const now = new Date();
+          const invoiceNo = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+            now.getDate()
+          ).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          // Direct payment insert
+          const { data: pData } = await supabase.from('payments').insert({
+            invoice_no: invoiceNo,
+            rental_id: params.rentalId,
+            amount: params.amount,
+            payment_method: params.paymentMethod,
+            notes: params.notes || null,
+          }).select().single();
+
+          // Direct cash transaction insert
+          const txNo = `CSH-IN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+            now.getDate()
+          ).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          await supabase.from('cash_transactions').insert({
+            transaction_no: txNo,
+            category_name: 'Pendapatan Rental',
+            type: 'in',
+            amount: params.amount,
+            reference_no: invoiceNo,
+            rental_id: params.rentalId,
+            payment_id: pData?.id || null,
+            description: `Pembayaran Rental [${params.paymentMethod}]`,
+            is_capital_asset: false,
+            status: 'valid',
+          });
+
+          // Update rental status in Supabase
+          const { data: rData } = await supabase.from('rentals').select('total_price, total_paid').eq('id', params.rentalId).single();
+          if (rData) {
+            const newTotalPaid = Number(rData.total_paid || 0) + params.amount;
+            const newPayStatus = newTotalPaid >= Number(rData.total_price) ? 'Lunas' : 'Sebagian';
+            await supabase.from('rentals').update({
+              total_paid: newTotalPaid,
+              payment_status: newPayStatus,
+            }).eq('id', params.rentalId);
+          }
+        }
       } catch (e: any) {
-        console.warn('Supabase rpc_record_payment error:', e);
+        console.warn('Supabase recordPayment exception:', e);
       }
     }
 
-    return localEngine.rpcRecordPayment(params);
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Record Expense (Kas Keluar)
@@ -146,6 +200,8 @@ export const financeService = {
     isCapitalAsset: boolean;
     transactionDate?: string;
   }): Promise<{ success: boolean; transaction?: CashTransaction; error?: string }> {
+    const localRes = localEngine.rpcRecordExpense(params);
+
     if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.rpc('rpc_record_expense', {
@@ -156,14 +212,33 @@ export const financeService = {
           p_is_capital_asset: params.isCapitalAsset,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
+
+        if (error) {
+          console.warn('RPC record_expense failed, using direct insert fallback:', error);
+          const now = new Date();
+          const txNo = `CSH-OUT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+            now.getDate()
+          ).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          await supabase.from('cash_transactions').insert({
+            transaction_no: txNo,
+            transaction_date: params.transactionDate || now.toISOString(),
+            category_name: params.categoryName,
+            type: 'out',
+            amount: params.amount,
+            reference_no: params.referenceNo || null,
+            description: params.description,
+            is_capital_asset: params.isCapitalAsset,
+            status: 'valid',
+          });
+        }
       } catch (e: any) {
         console.warn('Supabase rpc_record_expense error:', e);
       }
     }
 
-    return localEngine.rpcRecordExpense(params);
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Void Transaction
@@ -171,21 +246,31 @@ export const financeService = {
     transactionId: string;
     reason: string;
   }): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured) {
+    const localRes = localEngine.rpcVoidCashTransaction(params);
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.transactionId)) {
       try {
         const { error } = await supabase.rpc('rpc_void_cash_transaction', {
           p_transaction_id: params.transactionId,
           p_reason: params.reason,
           p_actor_id: (await supabase.auth.getUser()).data.user?.id || null,
         });
-        if (error) throw error;
-        return { success: true };
+
+        if (error) {
+          console.warn('RPC void failed, using direct update fallback:', error);
+          await supabase.from('cash_transactions').update({
+            status: 'void',
+            void_reason: params.reason,
+            voided_at: new Date().toISOString(),
+          }).eq('id', params.transactionId);
+        }
       } catch (e: any) {
         console.warn('Supabase rpc_void_cash_transaction error:', e);
       }
     }
 
-    return localEngine.rpcVoidCashTransaction(params);
+    window.dispatchEvent(new CustomEvent('rental-data-updated'));
+    return localRes;
   },
 
   // Financial summary & KPI indicators

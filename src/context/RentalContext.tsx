@@ -84,7 +84,12 @@ export const RentalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const unsubscribe = localEngine.subscribe(() => {
       loadData();
     });
-    return () => unsubscribe();
+    const handleEvent = () => loadData();
+    window.addEventListener('rental-data-updated', handleEvent);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('rental-data-updated', handleEvent);
+    };
   }, [loadData]);
 
   // 1-second reactive ticker for real-time countdown calculations

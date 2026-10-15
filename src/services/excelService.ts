@@ -609,13 +609,14 @@ export const excelService = {
             quantity: e.quantity,
             unit: e.unit,
             unit_price: e.unitPrice,
-            total_price: e.totalPrice,
             wattage: e.wattage,
             notes: e.notes || null,
             category: e.category,
           }));
-          await supabase.from('equipment_inventory').insert(payloads);
-        } catch {}
+          await supabase.from('equipment').insert(payloads);
+        } catch (eqErr) {
+          console.warn('Supabase equipment batch insert warning:', eqErr);
+        }
       }
 
       engine.addImportedEquipment(newEq);

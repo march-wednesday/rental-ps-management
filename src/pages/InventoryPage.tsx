@@ -1,10 +1,5 @@
-// ==============================================================================
-// RENTAL PS MANAGEMENT SYSTEM - ESTIMASI PERALATAN LISTRIK & INVENTARIS
-// Matching workbook sheet "Estimasi Peralatan Listrik" + Kalkulator Beban Listrik Bulanan
-// ==============================================================================
-
-import React, { useState } from 'react';
-import { localEngine } from '@/lib/mockEngine';
+import React, { useState, useEffect } from 'react';
+import { inventoryService } from '@/services/inventoryService';
 import { excelService } from '@/services/excelService';
 import { EquipmentItem } from '@/types';
 import { formatRupiah, formatNumber } from '@/utils/formatters';
@@ -23,10 +18,20 @@ import { Modal } from '@/components/common/Modal';
 import { useToast } from '@/context/ToastContext';
 
 export const InventoryPage: React.FC = () => {
-  const { success } = useToast();
-  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>(
-    localEngine.getState().equipment
-  );
+  const { success, error } = useToast();
+  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const items = await inventoryService.getEquipment();
+    setEquipmentList(items);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Electrical Calculator State
   const [dailyHours, setDailyHours] = useState<number>(14); // 14 jam per hari
@@ -80,43 +85,52 @@ export const InventoryPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    if (editItem) {
-      localEngine.updateEquipment(editItem.id, {
-        name: name.trim(),
-        specification: spec.trim() || undefined,
-        quantity: qty,
-        unit,
-        unitPrice,
-        wattage,
-        notes: notes.trim() || undefined,
-      });
-      success('Peralatan Diperbarui', `${name} berhasil diubah.`);
-    } else {
-      localEngine.addEquipment({
-        name: name.trim(),
-        specification: spec.trim() || undefined,
-        quantity: qty,
-        unit,
-        unitPrice,
-        wattage,
-        notes: notes.trim() || undefined,
-        category: 'Peralatan Listrik',
-      });
-      success('Peralatan Ditambahkan', `${name} ditambahkan ke daftar inventaris.`);
-    }
+    try {
+      if (editItem) {
+        await inventoryService.updateEquipment(editItem.id, {
+          name: name.trim(),
+          specification: spec.trim() || undefined,
+          quantity: qty,
+          unit,
+          unitPrice,
+          wattage,
+          notes: notes.trim() || undefined,
+        });
+        success('Peralatan Diperbarui', `${name} berhasil diubah.`);
+      } else {
+        await inventoryService.addEquipment({
+          name: name.trim(),
+          specification: spec.trim() || undefined,
+          quantity: qty,
+          unit,
+          unitPrice,
+          wattage,
+          notes: notes.trim() || undefined,
+          category: 'Peralatan Listrik',
+        });
+        success('Peralatan Ditambahkan', `${name} ditambahkan ke daftar inventaris.`);
+      }
 
-    setEquipmentList([...localEngine.getState().equipment]);
-    setIsModalOpen(false);
+      await loadData();
+      setIsModalOpen(false);
+    } catch (err: any) {
+      error('Gagal Menyimpan', err.message || 'Terjadi kesalahan.');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    localEngine.deleteEquipment(id);
-    setEquipmentList([...localEngine.getState().equipment]);
-    success('Peralatan Dihapus', 'Item dihapus dari daftar.');
+  const handleDelete = async (id: string, itemName: string) => {
+    if (!window.confirm(`Yakin ingin menghapus "${itemName}" dari inventaris?`)) return;
+    try {
+      await inventoryService.deleteEquipment(id);
+      await loadData();
+      success('Peralatan Dihapus', 'Item dihapus dari daftar.');
+    } catch (err: any) {
+      error('Gagal Menghapus', err.message || 'Terjadi kesalahan.');
+    }
   };
 
   return (
@@ -318,7 +332,7 @@ export const InventoryPage: React.FC = () => {
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => handleDelete(item.id, item.name)}
                         className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
                         title="Hapus komponen"
                       >
