@@ -19,14 +19,15 @@ export const ExtendRentalModal: React.FC<ExtendRentalModalProps> = ({
   onClose,
   rental,
 }) => {
-  const { extendRental, isSubmitting } = useRental();
+  const { units, extendRental, isSubmitting } = useRental();
   const [selectedMinutes, setSelectedMinutes] = useState<number>(60);
   const [errorMessage, setErrorMessage] = useState('');
 
   if (!rental) return null;
 
-  // Rate per 60 min is Rp 10.000 (10000 / 60 = ~166.67/min)
-  const additionalPrice = (selectedMinutes / 60) * 10000;
+  const currentUnit = units.find((u) => u.id === rental.unitId || u.code === rental.unitCode);
+  const hourlyRate = currentUnit?.hourlyRate || 10000;
+  const additionalPrice = Math.round((selectedMinutes / 60) * hourlyRate);
 
   const handleExtend = async () => {
     setErrorMessage('');
@@ -81,7 +82,7 @@ export const ExtendRentalModal: React.FC<ExtendRentalModalProps> = ({
             >
               <div className="text-xs font-bold">{opt.label}</div>
               <div className="text-[10px] text-purple-300 mt-0.5">
-                {formatRupiah((opt.minutes / 60) * 10000)}
+                {formatRupiah(Math.round((opt.minutes / 60) * hourlyRate))}
               </div>
             </button>
           ))}
